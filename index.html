@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Learn to read notes</title>
+<style>
+body {
+  font-size: 18px;
+}
+
+.names .note {
+  display: inline-block;
+}
+
+.names .name {
+  height: 2.1em;
+  width: 3em;
+  border: 1px solid #999;
+  margin: 1px 1px 1px 0;
+  text-align: center;
+  vertical-align: middle;
+  padding-top: 0.9em;
+  cursor: pointer;
+}
+
+.names .name:hover {
+  background-color: #ecc;
+}
+
+.names .name.virtual {
+  color: #aaa; 
+}
+
+.keybd {
+}
+
+.key {
+  position: relative;
+  display: inline-block;
+  vertical-align: top;
+  width: 20px;
+  height: 150px;
+  border: 1px solid black;
+  margin-left: 1px;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.key:hover {
+  background-color: #ecc;
+}
+
+.key.black:hover {
+  background-color: #722;
+}
+
+.key.black {
+  background-color: black;
+  left: 8px;
+  height: 90px;
+  width: 13px;
+  margin-left: -15px;
+  z-index: 2;
+}
+
+.key .label {
+  font-size: 10px;
+  position: absolute;
+  bottom: 5px;
+  width: 100%;
+  text-align: center;
+}
+
+.key.black .label {
+  color: white;
+}
+</style>
+<script src="d3.v4.js"></script>
+<script src="d3-selection-multi.v1.min.js"></script>
+<script src="vexflow-min.js"></script>
+</head>
+
+<body>
+
+<div class="score-wrapper">
+
+<svg class="score" id="score" width="500" height="300">
+</svg>
+
+</div>
+
+
+<div class="names-wrapper">
+
+<div class="names">
+</div>
+
+</div>
+
+
+<div class="keybd-wrapper">
+
+<div class="keybd">
+</div>
+
+</div>
+
+<script>
+const noteNames = ["C","D","E","F","G","A","B"];
+const noSharp = ["B","E"], noFlat = ["C","F"];
+const sharp = "♯", natural = "♮", flat = "♭";
+
+const keybdOctaves = 9, keybdStartKey = "A", keybdEndKey = "C";
+
+var names = d3.select(".names")
+  .selectAll(".name")
+  .data(noteNames)
+;
+
+names = names.enter()
+  .append("div")
+  .attr("class", "note")
+ .merge(names)
+;
+ 
+names.selectAll()
+  .data(d => [{note: d, modifier: sharp}, {note: d}, {note: d, modifier: flat}])
+  .enter()
+  .append("div")
+  .attr("class", "name")
+  .classed("virtual", d => (d.modifier == sharp && noSharp.includes(d.note)) || (d.modifier == flat && noFlat.includes(d.note)))
+  .text(d => d.note + (d.modifier || ""))
+;
+  
+var keys = [];
+
+for (var i=0; i< keybdOctaves; i++) {
+  noteNames.forEach(noteName => {
+    // skip keys in first octave before keybdStartKey
+    if (i==0 && noteNames.indexOf(noteName) < noteNames.indexOf(keybdStartKey)) return;
+    if (i==keybdOctaves-1 && noteNames.indexOf(noteName) > noteNames.indexOf(keybdEndKey)) return;
+    var lastKey = (i==keybdOctaves-1 && noteNames.indexOf(noteName) == noteNames.indexOf(keybdEndKey));
+    keys.push({note: noteName});
+    if (!noSharp.includes(noteName) && !lastKey) {
+      keys.push({note: noteName, modifier: sharp, octave: i});
+    }
+  })
+}
+
+var keys = d3.select(".keybd")
+  .selectAll(".key")
+  .data(keys)
+  .enter()
+  .append("div")
+  .classed("key", true)
+  .classed("black", d => d.modifier)
+  .append("span")
+  .classed("label", true)
+  .text(d => d.note + (d.modifier || ""))
+;
+
+VF = Vex.Flow;
+
+var renderer = new VF.Renderer(document.getElementById("score"), VF.Renderer.Backends.SVG);
+
+renderer.resize(500, 300);
+var context = renderer.getContext();
+context.scale(2,2);
+//context.setFont("Arial", 10, "").setBackgroundFillStyle("#eed");
+
+var stave = new VF.Stave(0, 0, 200);
+
+stave.addClef("treble");
+stave.addKeySignature("G");
+
+stave.setContext(context).draw();
+
+var voice = new VF.Voice({num_beats: 5,  beat_value: 4});
+voice.addTickables([
+  new VF.GhostNote({duration: "q" }),
+  new VF.StaveNote({clef: "treble", keys: ["C/5"], duration: "w" })
+	  .addAccidental(0, new VF.Accidental("#"))
+]);
+
+var formatter = new VF.Formatter().joinVoices([voice]).format([voice], 200);
+
+voice.draw(context, stave);
+</script>
+
+</body>
+</html>
