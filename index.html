@@ -85,9 +85,11 @@ body {
 <body>
 
 <div class="score-wrapper" id="score-wrapper">
-
 </div>
 
+<div class="stats-wrapper">
+Correct: <span id="stat-correct">0</span> Wrong: <span id="stat-wrong">0</span> Avg. Time: <span id="stat-time">∞</span> sec. <button id="button-reset">reset</button>
+</div>
 
 <div class="names-wrapper">
 
@@ -113,7 +115,7 @@ const keybdOctaves = 9, keybdStartKey = "A", keybdEndKey = "C";
 
 var container = document.getElementById("names");
 
-noteNames.forEach(name => {
+noteNames.forEach(note => {
   var wrapper = document.createElement("div");
   wrapper.className = "note";
   container.appendChild(wrapper);
@@ -121,11 +123,20 @@ noteNames.forEach(name => {
   [sharp, null, flat].forEach(modifier => {
     var el = document.createElement("div");
     el.className = "name";
-    if ((modifier == sharp && noSharp.includes(name)) || (modifier == flat && noFlat.includes(name))) {
+    if ((modifier == sharp && noSharp.includes(note)) || (modifier == flat && noFlat.includes(note))) {
       el.classList.add("virtual");
     }
-    el.innerHTML = name + (modifier || "");
+    el.innerHTML = note + (modifier || "");
     wrapper.appendChild(el);
+    
+    el.addEventListener("click", function() {
+      if (currentNote && currentNote.equals({note: note, modifier: modifier})) {
+        success();
+      }
+      else {
+        fail();
+      }
+    });
   });
 });
 
@@ -179,37 +190,95 @@ function RndNote(options) {
     var octave = options.startOctave + Math.floor(Math.random() * (options.endOctave - options.startOctave));
     var note = candidates[Math.floor(Math.random()*candidates.length)];
     
-    return {
-      note: note.note,
-      modifier: note.modifier,
-      octave: octave,
-      toString: () => this.note + (this.modifier||"") + "/" + this.octave,
-      getStaveNote: function(options) {
-        var sn = new VF.StaveNote(Object.assign({
-          keys: [this.note + "/" + this.octave],
-          duration: "w",
-          clef: "treble"
-        }, options));
-        switch (note.modifier) {
-          case flat: sn.addAccidental(0, new VF.Accidental("#")); break;
-          case sharp: sn.addAccidental(0, new VF.Accidental("b")); break;
-        }
-        return sn;
-      }
-    }
+    return new Note(note, {octave: octave});
   }
+}
+
+function Note(note, options) {
+  if (!this instanceof Note) return new Note(note, modifier, octave);
+  
+  this.note = note.note || note;
+  this.modifier = options.modifier || note.modifier || undefined;
+  this.octave = options.octave || note.octave || 5;
+  
+  this.toString = function() {
+    return this.note + (this.modifier||"") + "/" + this.octave;
+  };
+  
+  this.getStaveNote = function(options) {
+    var sn = new VF.StaveNote(Object.assign({
+      keys: [this.note + "/" + this.octave],
+      duration: "w",
+      clef: "treble"
+    }, options));
+    switch (note.modifier) {
+      case flat: sn.addAccidental(0, new VF.Accidental("b")); break;
+      case sharp: sn.addAccidental(0, new VF.Accidental("#")); break;
+    }
+    return sn;
+  };
+  
+  this.equals = function(other) {
+    // if octave is set on both, compare
+    if (this.octave && other.octave && (this.octave != other.octave)) return false;
+    return (this.note == other.note && this.modifier == other.modifier);
+  }
+  
 }
 
 var rndNote = RndNote();
 
 var currentNote = null;
 
-var correct = 0, wrong = 0, time = 0;
+var correct = 0, wrong = 0;
+
+var startTime = Date.now();
 
 function play() {
   currentNote = rndNote();
   drawNote(currentNote);
 }
+
+function success() {
+  correct++;
+  updateStats();
+  play();
+  flash("#99ff99");
+}
+
+function fail() {
+  wrong++;
+  updateStats();
+  play();
+  flash("#ff9999");
+}
+
+function reset() {
+  correct = 0;
+  wrong = 0;
+  startTime = Date.now();
+  updateStats();
+  play();
+}
+
+function updateStats() {
+  document.getElementById("stat-correct").innerHTML = correct;
+  document.getElementById("stat-wrong").innerHTML = wrong;
+  var sec = "∞";
+  if (correct > 0) {
+    var ms = (Date.now()-startTime)/correct;
+    var sec = Math.round(ms / 10) / 100;
+  }
+  document.getElementById("stat-time").innerHTML = sec;
+}
+
+function flash(color, duration) {
+  duration = duration || 120;
+  document.body.style.backgroundColor = color;
+  window.setTimeout(function(){document.body.style.backgroundColor = null}, duration);
+}
+
+document.getElementById("button-reset").addEventListener("click", reset);
 
 VF = Vex.Flow;
 
