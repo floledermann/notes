@@ -76,8 +76,7 @@ body {
 }
 </style>
 <script src="d3.v4.js"></script>
-<script src="d3-selection-multi.v1.min.js"></script>
-<script src="vexflow-min.js"></script>
+<script src="vexflow.js"></script>
 </head>
 
 <body>
@@ -159,6 +158,52 @@ var keys = d3.select(".keybd")
   .text(d => d.note + (d.modifier || ""))
 ;
 
+function RndNote(options) {
+  options = Object.assign({
+    startOctave: 2,
+    endOctave: 6,
+    modifiers: true
+  }, options);
+  
+  var candidates = [];
+  
+  noteNames.forEach(note => {
+    if (options.modifiers && !noFlat.includes(note)) {
+      candidates.push({note: note, modifier: flat});
+    }
+    candidates.push({note: note});
+    if (options.modifiers && !noSharp.includes(note)) {
+      candidates.push({note: note, modifier: sharp});
+    } 
+  });
+    
+  return function() {
+    var octave = options.startOctave + Math.floor(Math.random() * (options.endOctave - options.startOctave));
+    var note = candidates[Math.floor(Math.random()*candidates.length)];
+    
+    return {
+      note: note.note,
+      modifier: note.modifier,
+      octave: octave,
+      toString: () => this.note + (this.modifier||"") + "/" + this.octave,
+      getStaveNote: function(options) {
+        var sn = new VF.StaveNote(Object.assign({
+          keys: [this.note + "/" + this.octave],
+          duration: "w",
+          clef: "treble"
+        }, options));
+        switch (note.modifier) {
+          case flat: sn.addAccidental(0, new VF.Accidental("#")); break;
+          case sharp: sn.addAccidental(0, new VF.Accidental("b")); break;
+        }
+        return sn;
+      }
+    }
+  }
+}
+
+var rndNote = RndNote();
+
 VF = Vex.Flow;
 
 var renderer = new VF.Renderer(document.getElementById("score"), VF.Renderer.Backends.SVG);
@@ -170,21 +215,27 @@ context.scale(2,2);
 
 var stave = new VF.Stave(0, 0, 200);
 
-stave.addClef("treble");
-stave.addKeySignature("G");
 
-stave.setContext(context).draw();
+function drawNote(note) {
 
-var voice = new VF.Voice({num_beats: 5,  beat_value: 4});
-voice.addTickables([
-  new VF.GhostNote({duration: "q" }),
-  new VF.StaveNote({clef: "treble", keys: ["C/5"], duration: "w" })
-	  .addAccidental(0, new VF.Accidental("#"))
-]);
+  var clef = (note.octave < 4) ? "bass" : "treble";
+  stave.addClef(clef);
+  //stave.addKeySignature("G");
 
-var formatter = new VF.Formatter().joinVoices([voice]).format([voice], 200);
+  stave.setContext(context).draw();
 
-voice.draw(context, stave);
+  var voice = new VF.Voice({num_beats: 5,  beat_value: 4});
+  voice.addTickables([
+    new VF.GhostNote({duration: "q" }),
+    note.getStaveNote({clef: clef})
+  ]);
+
+  var formatter = new VF.Formatter().joinVoices([voice]).format([voice], 200);
+
+  voice.draw(context, stave);
+}
+
+drawNote(rndNote());
 </script>
 
 </body>
