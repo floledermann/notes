@@ -8,6 +8,10 @@ body {
   font-size: 18px;
 }
 
+.names-wrapper {
+  margin-bottom: 1em;
+}
+
 .names .note {
   display: inline-block;
 }
@@ -75,23 +79,19 @@ body {
   color: white;
 }
 </style>
-<script src="d3.v4.js"></script>
 <script src="vexflow.js"></script>
 </head>
 
 <body>
 
-<div class="score-wrapper">
-
-<svg class="score" id="score" width="500" height="300">
-</svg>
+<div class="score-wrapper" id="score-wrapper">
 
 </div>
 
 
 <div class="names-wrapper">
 
-<div class="names">
+<div class="names" id="names">
 </div>
 
 </div>
@@ -99,7 +99,7 @@ body {
 
 <div class="keybd-wrapper">
 
-<div class="keybd">
+<div class="keybd" id="keybd">
 </div>
 
 </div>
@@ -111,27 +111,26 @@ const sharp = "♯", natural = "♮", flat = "♭";
 
 const keybdOctaves = 9, keybdStartKey = "A", keybdEndKey = "C";
 
-var names = d3.select(".names")
-  .selectAll(".name")
-  .data(noteNames)
-;
+var container = document.getElementById("names");
 
-names = names.enter()
-  .append("div")
-  .attr("class", "note")
- .merge(names)
-;
- 
-names.selectAll()
-  .data(d => [{note: d, modifier: sharp}, {note: d}, {note: d, modifier: flat}])
-  .enter()
-  .append("div")
-  .attr("class", "name")
-  .classed("virtual", d => (d.modifier == sharp && noSharp.includes(d.note)) || (d.modifier == flat && noFlat.includes(d.note)))
-  .text(d => d.note + (d.modifier || ""))
-;
+noteNames.forEach(name => {
+  var wrapper = document.createElement("div");
+  wrapper.className = "note";
+  container.appendChild(wrapper);
   
-var keys = [];
+  [sharp, null, flat].forEach(modifier => {
+    var el = document.createElement("div");
+    el.className = "name";
+    if ((modifier == sharp && noSharp.includes(name)) || (modifier == flat && noFlat.includes(name))) {
+      el.classList.add("virtual");
+    }
+    el.innerHTML = name + (modifier || "");
+    wrapper.appendChild(el);
+  });
+});
+
+
+var container = document.getElementById("keybd");
 
 for (var i=0; i< keybdOctaves; i++) {
   noteNames.forEach(noteName => {
@@ -139,24 +138,23 @@ for (var i=0; i< keybdOctaves; i++) {
     if (i==0 && noteNames.indexOf(noteName) < noteNames.indexOf(keybdStartKey)) return;
     if (i==keybdOctaves-1 && noteNames.indexOf(noteName) > noteNames.indexOf(keybdEndKey)) return;
     var lastKey = (i==keybdOctaves-1 && noteNames.indexOf(noteName) == noteNames.indexOf(keybdEndKey));
-    keys.push({note: noteName});
+    
+    function makeKey(note) {
+      var key = document.createElement("div");
+      key.className = "key";
+      if (note.modifier) {
+        key.classList.add("black");
+      }
+      container.appendChild(key);
+    }
+
+    makeKey({note: noteName, octave: i});
+    
     if (!noSharp.includes(noteName) && !lastKey) {
-      keys.push({note: noteName, modifier: sharp, octave: i});
+      makeKey({note: noteName, modifier: sharp, octave: i});
     }
   })
 }
-
-var keys = d3.select(".keybd")
-  .selectAll(".key")
-  .data(keys)
-  .enter()
-  .append("div")
-  .classed("key", true)
-  .classed("black", d => d.modifier)
-  .append("span")
-  .classed("label", true)
-  .text(d => d.note + (d.modifier || ""))
-;
 
 function RndNote(options) {
   options = Object.assign({
@@ -204,20 +202,31 @@ function RndNote(options) {
 
 var rndNote = RndNote();
 
+var currentNote = null;
+
+var correct = 0, wrong = 0, time = 0;
+
+function play() {
+  currentNote = rndNote();
+  drawNote(currentNote);
+}
+
 VF = Vex.Flow;
 
-var renderer = new VF.Renderer(document.getElementById("score"), VF.Renderer.Backends.SVG);
+var renderer = new VF.Renderer(document.getElementById("score-wrapper"), VF.Renderer.Backends.SVG);
 
-renderer.resize(500, 300);
+renderer.resize(500, 250);
 var context = renderer.getContext();
 context.scale(2,2);
 //context.setFont("Arial", 10, "").setBackgroundFillStyle("#eed");
 
-var stave = new VF.Stave(0, 0, 200);
-
 
 function drawNote(note) {
 
+  context.clear();
+
+  var stave = new VF.Stave(0, 0, 200);
+  
   var clef = (note.octave < 4) ? "bass" : "treble";
   stave.addClef(clef);
   //stave.addKeySignature("G");
@@ -235,7 +244,8 @@ function drawNote(note) {
   voice.draw(context, stave);
 }
 
-drawNote(rndNote());
+play();
+
 </script>
 
 </body>
